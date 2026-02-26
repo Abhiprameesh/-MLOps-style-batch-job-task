@@ -8,10 +8,6 @@ import time
 import sys
 import os
 
-
-# ----------------------------
-# CLI Arguments
-# ----------------------------
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", required=True)
@@ -20,10 +16,6 @@ def parse_args():
     parser.add_argument("--log-file", required=True)
     return parser.parse_args()
 
-
-# ----------------------------
-# Logging Setup
-# ----------------------------
 def setup_logging(log_file):
     logging.basicConfig(
         filename=log_file,
@@ -31,10 +23,6 @@ def setup_logging(log_file):
         format="%(asctime)s - %(levelname)s - %(message)s"
     )
 
-
-# ----------------------------
-# Load & Validate Config
-# ----------------------------
 def load_config(path):
     if not os.path.exists(path):
         raise FileNotFoundError("Config file not found")
@@ -58,38 +46,34 @@ def load_config(path):
 
     return config
 
-
-# ----------------------------
-# Load & Validate Dataset
-# ----------------------------
 def load_data(path):
     if not os.path.exists(path):
         raise FileNotFoundError("Input CSV not found")
 
     try:
-        # Read raw lines manually
+        # read raw lines manually
         with open(path, "r") as f:
             lines = f.readlines()
 
         if not lines:
             raise ValueError("CSV is empty")
 
-        # Remove surrounding quotes and newline characters
+        # remove surrounding quotes and newline characters
         lines = [line.strip().strip('"') for line in lines]
 
-        # Split header
+        # split header
         header = lines[0].split(",")
 
-        # Split remaining rows
+        # split remaining rows
         data_rows = [row.split(",") for row in lines[1:]]
 
-        # Create dataframe manually
+        # create dataframe manually
         df = pd.DataFrame(data_rows, columns=header)
 
-        # Normalize column names
+        # normalize column names
         df.columns = df.columns.str.strip().str.lower()
 
-        # Convert close column to numeric
+        # convert close column to numeric
         if "close" in df.columns:
             df["close"] = pd.to_numeric(df["close"], errors="coerce")
 
@@ -103,9 +87,7 @@ def load_data(path):
         raise ValueError("Missing required column: close")
 
     return df
-# ----------------------------
-# Processing Logic
-# ----------------------------
+
 def process(df, window):
     logging.info("Computing rolling mean")
 
@@ -118,9 +100,7 @@ def process(df, window):
     return df
 
 
-# ----------------------------
-# Compute Metrics
-# ----------------------------
+
 def compute_metrics(df, version, seed, latency_ms):
     signal_rate = df["signal"].mean()
 
@@ -134,10 +114,6 @@ def compute_metrics(df, version, seed, latency_ms):
         "status": "success"
     }
 
-
-# ----------------------------
-# Error Metrics Writer
-# ----------------------------
 def write_error_metrics(output_path, version, error_message):
     metrics = {
         "version": version if version else "unknown",
@@ -151,9 +127,7 @@ def write_error_metrics(output_path, version, error_message):
     print(json.dumps(metrics, indent=4))
 
 
-# ----------------------------
-# Main
-# ----------------------------
+
 def main():
     args = parse_args()
     setup_logging(args.log_file)
@@ -163,24 +137,22 @@ def main():
     try:
         logging.info("Job started")
 
-        # Load config
+        # load config
         config = load_config(args.config)
         logging.info(f"Config loaded: {config}")
 
-        # Set deterministic seed
+        # set deterministic seed
         np.random.seed(config["seed"])
-
-        # 🔥 DATASET IS LOADED HERE
         df = load_data(args.input)
         logging.info(f"Rows loaded: {len(df)}")
 
-        # Process
+        # process
         df = process(df, config["window"])
 
-        # Timing
+        # timing
         latency_ms = (time.time() - start_time) * 1000
 
-        # Metrics
+        # metrics
         metrics = compute_metrics(
             df,
             config["version"],
@@ -188,14 +160,14 @@ def main():
             latency_ms
         )
 
-        # Write metrics file
+        # write metrics file
         with open(args.output, "w") as f:
             json.dump(metrics, f, indent=4)
 
         logging.info(f"Metrics: {metrics}")
         logging.info("Job completed successfully")
 
-        # Print final metrics to stdout (Docker requirement)
+        # print final metrics to stdout (Docker requirement)
         print(json.dumps(metrics, indent=4))
 
         sys.exit(0)
